@@ -1,0 +1,9 @@
+# Default resource file for ProxPop
+# Format is: type URL
+
+
+# Default HTTP resource
+http https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=anonymous&simplified=true
+
+# Default SOCKS5 resource
+socks5 https://api.proxyscrape.com/v2/?request=getproxies&protocol=socks5&timeout=10000&country=all

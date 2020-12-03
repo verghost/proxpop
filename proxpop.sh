@@ -2,13 +2,6 @@
 # ProxPop v0: A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
 # Written by verghost (https://github.com/verghost)
 #
-# TODO: Add dynamic_chain and strict_chain options (this will require a "only fetch first N proxies" option)
-# TODO: Add a dynamic_chain option that starts the request from tor: dynamic_chain is on, user provides chain length (# of IPs) and their type(s)
-#   -> look into whether certain types of proxies don't work from TOR
-#     -> TOR->HTTP doesn't seem to work, maybe try TOR->SOCKS5->HTTP or other further layered iterations (i.e. tor->socks->http->socks->http->destination)
-# Does proxyscrape socks5 send along a referer or forwarded-for header or something? If so, then would it send for the tor node?
-# TODO: Add support for usernames and passwords
-# Difference between prroxychains and proxychains4
 
 usage=\
 'ProxPop: Proxychains config populator

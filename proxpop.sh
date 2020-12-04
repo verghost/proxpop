@@ -113,20 +113,20 @@ add_proxy() {
 	while IFS= read -r ipp; do
 		echo "$type $ipp" | awk -F':' '{print $1,$2}' >> $TMP_CONF
 	done < $file
-	echo "" > $file # clear temp file
+	rm -f $file # clear temp file
 }
 
 fetch_proxies() {
 	pp_echo "Fetching proxies..."
 	echo "[ProxyList]" >> $TMP_CONF
 	while IFS= read -r rec; do
-		if [[ "${rec:0:4}" == "http" ]] && [[ $PROXPOP_HTTP ]]; then
+		if [[ "${rec:0:4}" == "http" ]] && [[ ! "$PROXPOP_HTTP" == "" ]]; then
 			pp_curl $TMP_HTTP "${rec:5}"
 			add_proxy "http" $TMP_HTTP
-		elif [[ "${rec:0:6}" == "socks4" ]] && [[ $PROXPOP_SOCKS4 ]]; then
+		elif [[ "${rec:0:6}" == "socks4" ]] && [[ ! "$PROXPOP_SOCKS4" == "" ]]; then
 			pp_curl $TMP_SOCKS4 "${rec:6}"
 			add_proxy "socks4" $TMP_SOCKS4
-		elif [[ "${rec:0:6}" == "socks5" ]] && [[ $PROXPOP_SOCKS5 ]]; then
+		elif [[ "${rec:0:6}" == "socks5" ]] && [[ ! "$PROXPOP_SOCKS5" == "" ]]; then
 			pp_curl $TMP_SOCKS5 "${rec:6}"
 			add_proxy "socks5" $TMP_SOCKS5
 		fi
@@ -136,15 +136,15 @@ fetch_proxies() {
 populate() {
 	pp_echo ""
 	pp_echo "Starting ProxPop..."
-	touch $TMP_HTTP
-	touch $TMP_SOCKS4
-	touch $TMP_SOCKS5
+	
+	if [[ $PROXPOP_KEEP ]]; then # keep old config 
+		cp -f $PC_CONF_PATH $OLD_CONFIG
+	fi
 	
 	pp_echo "Writing configuration file..."
 	touch $TMP_CONF # create base config file
 	echo $TEMPLATE_MODE > $TMP_CONF
-	for k in "${!PP_TOPTS[@]}"
-	do
+	for k in "${!PP_TOPTS[@]}"; do
 		if [[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]]; then
 			echo "$k ${PP_TOPTS[$k]}" >> $TMP_CONF
 		fi

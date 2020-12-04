@@ -250,9 +250,10 @@ while [[ "$#" -gt 0 ]]; do
 	--use-random)
 		set_template_mode "random_chain"
 		shift
-		local chain_len="$(get_first_n $1 t)"
-		if [[ "$chain_len" == "t" ]]; then PP_TOPTS["chain_len"]="= 2"; 
-		else shift; PP_TOPTS["chain_len"]="= ${chain_len}"; fi
+		PP_TOPTS["chain_len"]="= $(get_first_n $1 d)"
+		if [[ "${PP_TOPTS[chain_len]}" == "= d" ]]; then 
+			PP_TOPTS["chain_len"]="= 2"
+		else shift; fi
 	;;
 	
 	# Safety options

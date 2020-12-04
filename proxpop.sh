@@ -7,11 +7,11 @@ usage=\
 A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
 
 usage: proxpop.sh [options]
-	[Proxy Types]
-	--http         Populate HTTP proxies
-	--socks4       Populate SOCKS4 proxies
-	--scosk5       Populate SCOKS5 proxies
-	--all          Populate all types of proxies (HTTP, SOCKS4 & SOCKS5)
+	[Proxy Types] For each type, you can chosse to only fetch the first n proxies (ex. proxpop.sh --http 4).
+	--http   [n]   Populate HTTP proxies
+	--socks4 [n]   Populate SOCKS4 proxies
+	--scosk5 [n]   Populate SCOKS5 proxies
+	--all    [n]   Populate all types of proxies (HTTP, SOCKS4 & SOCKS5)
 	
 	[Template Options]
 	-t, --template Use custom template file (Default is proxychains.template)
@@ -22,7 +22,7 @@ usage: proxpop.sh [options]
 	
 	[Saftey Options]
 	-k, --keep     Keep old configuration file (Old file is copied to /usr/share/proxpop/proxychains.old)
-	-r, --review   Review final configuration file before finalizing (-s/--silent does not apply to this option)
+	--review   Review final configuration file before finalizing (-s/--silent does not apply to this option)
 	
 	[Fetch Options]
 	--tor-fetch    Try to fetch resources through TOR (must have TOR installed, may not work since many sites block TOR nodes)
@@ -56,10 +56,10 @@ PP_TOPTS["chain_len"]="#"
 PP_TOPTS["tcp_read_time_out"]=15000
 PP_TOPTS["tcp_connect_time_out"]=8000
 
-TMP_HTTP="/tmp/http_prox_${RANDOM}"
-TMP_SOCKS4="/tmp/socks5_prox_${RANDOM}"
-TMP_SOCKS5="/tmp/socks4_prox_${RANDOM}"
-TMP_CONF="/tmp/proxychains_${RANDOM}.conf"
+TMP_HTTP="/tmp/http_prox"
+TMP_SOCKS4="/tmp/socks5_prox"
+TMP_SOCKS5="/tmp/socks4_prox"
+TMP_CONF="/tmp/proxychains.conf"
 
 PC_CONF_PATH="/etc/proxychains.conf"
 OLD_CONFIG="/usr/share/proxpop/proxychains.old"
@@ -97,24 +97,20 @@ pp_exit() {
 # Curl something and them append output to 
 pp_curl() {
 	local out=$1; shift;
-	local tmp="/tmp/ppcurl_output_${RANDOM}.tmp"
 	
 	if [[ $PROXPOP_TORFETCH ]]; then 
-		torify curl -s -o "$tmp" $*
+		torify curl -s -o $out "$*"
 	elif [[ $PROXPOP_PROXYFETCH ]]; then
-		proxychains curl -s -o "$tmp" $*
+		proxychains curl -s -o $out "$*"
 	else
-		curl -s -o "$tmp" $* >> $out
+		curl -s -o $out $*
 	fi
-	
-	cat  >> $out
-	rm -f $out
 }
 
 add_proxy() {
 	local type=$1
 	local file=$2
-	while IFS=, read -r ipp; do
+	while IFS= read -r ipp; do
 		echo "$type $ipp" | awk -F':' '{print $1,$2}' >> $TMP_CONF
 	done < $file
 	echo "" > $file # clear temp file
@@ -123,15 +119,15 @@ add_proxy() {
 fetch_proxies() {
 	pp_echo "Fetching proxies..."
 	echo "[ProxyList]" >> $TMP_CONF
-	while IFS=, read -r rec; do
+	while IFS= read -r rec; do
 		if [[ "${rec:0:4}" == "http" ]] && [[ $PROXPOP_HTTP ]]; then
-			pp_curl "$TMP_HTTP" "${rec:5}"
+			pp_curl $TMP_HTTP "${rec:5}"
 			add_proxy "http" $TMP_HTTP
-		elif [[ "${rec:0:5}" == "socks4" ]] && [[ $PROXPOP_SOCKS4 ]]; then
-			pp_curl "$TMP_SOCKS4" "${rec:6}"
+		elif [[ "${rec:0:6}" == "socks4" ]] && [[ $PROXPOP_SOCKS4 ]]; then
+			pp_curl $TMP_SOCKS4 "${rec:6}"
 			add_proxy "socks4" $TMP_SOCKS4
-		elif [[ "${rec:0:5}" == "socks5" ]] && [[ $PROXPOP_SOCKS5 ]]; then
-			pp_curl "$TMP_SOCKS5" "${rec:6}"
+		elif [[ "${rec:0:6}" == "socks5" ]] && [[ $PROXPOP_SOCKS5 ]]; then
+			pp_curl $TMP_SOCKS5 "${rec:6}"
 			add_proxy "socks5" $TMP_SOCKS5
 		fi
 	done < $RESOURCE_FILE
@@ -140,9 +136,13 @@ fetch_proxies() {
 populate() {
 	pp_echo ""
 	pp_echo "Starting ProxPop..."
+	touch $TMP_HTTP
+	touch $TMP_SOCKS4
+	touch $TMP_SOCKS5
 	
 	pp_echo "Writing configuration file..."
-	echo "" > $TMP_CONF # create base config file
+	touch $TMP_CONF # create base config file
+	echo $TEMPLATE_MODE > $TMP_CONF
 	for k in "${!PP_TOPTS[@]}"
 	do
 		if [[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]]; then
@@ -152,13 +152,15 @@ populate() {
 	
 	fetch_proxies
 	
+	chmod 644 $TMP_CONF
+	
 	sleep 1
 	pp_echo "New configuration is ready!"
 	
 	if [[ $PROXPOP_REVIEW ]]; then
 		sleep 1
 		echo "Please review the new file when it appears..."
-		sleep 3
+		sleep 2
 
 		more $TMP_CONF
 		echo ""
@@ -168,7 +170,7 @@ populate() {
 			read yorn
 			if [[ "$yorn" == "y" ]] || [[ "$yorn" == "Y" ]]; then
 				echo "Replacing current config..."
-				mv $TMP_CONF $PC_CONF_PATH
+				mv -f $TMP_CONF $PC_CONF_PATH
 				break
 			elif [[ "$yorn" == "n" ]] || [[ "$yorn" == "N" ]]; then
 				echo "OK, aborting..."
@@ -177,6 +179,8 @@ populate() {
 				echo "Not a valid response!"
 			fi
 		done
+	else
+		mv -f $TMP_CONF $PC_CONF_PATH
 	fi
 	
 	pp_exit 0
@@ -190,17 +194,44 @@ set_template_mode() {
 	fi
 }
 
+get_first_n() {
+	local ret="$2" # default value
+	case "$1" in # https://stackoverflow.com/a/3951175
+		''|*[!0-9]*) ;; # negates strings, floating point and negative numbers
+		*) ret=$1 ;;
+	esac
+	echo "$ret"
+}
+
+if [ "$EUID" -ne 0 ]
+	then echo "Error: This script must be run as root!"
+	exit
+fi
+
 while [[ "$#" -gt 0 ]]; do
 	case "$1" in
 	# Proxy types
-	--http) PROXPOP_HTTP=1; shift; ;;
-	--socks4) PROXPOP_SOCKS4=1; shift; ;;
-	--socks5) PROXPOP_SOCKS5=1; shift; ;;
-	--all)
-		PROXPOP_HTTP=1
-		PROXPOP_SOCKS4=1
-		PROXPOP_SOCKS5=1
+	--http) 
 		shift
+		PROXPOP_HTTP="$(get_first_n $1 all)"
+		[[ ! "$PROXPOP_HTTP" == "all" ]] && shift
+	;;
+	--socks4) 
+		shift
+		PROXPOP_SOCKS4="$(get_first_n $1 all)"
+		[[ ! "$PROXPOP_SOCKS4" == "all" ]] && shift
+	;;
+	--socks5)
+		shift
+		PROXPOP_SOCKS5="$(get_first_n $1 all)"
+		[[ ! "$PROXPOP_SOCKS5" == "all" ]] && shift
+	;;
+	--all)
+		shift
+		PROXPOP_HTTP="$(get_first_n $1 all)"
+		PROXPOP_SOCKS4="$PROXPOP_HTTP"
+		PROXPOP_SOCKS5="$PROXPOP_HTTP"
+		[[ ! "$PROXPOP_HTTP" == "all" ]] && shift
 	;;
 	
 	# Template options
@@ -219,10 +250,7 @@ while [[ "$#" -gt 0 ]]; do
 	--use-random) 
 		set_template_mode "random_chain"
 		shift
-		case "$1" in # https://stackoverflow.com/a/3951175
-			''|*[!0-9]*) ;; # negates strings, floating point and negative numbers
-			*) PP_TOPTS["chain_len"]="= $1" ;;
-		esac
+		PP_TOPTS["chain_len"]="= $(get_first_n $1 2)"
 	;;
 	
 	# Safety options
@@ -234,14 +262,14 @@ while [[ "$#" -gt 0 ]]; do
 		if [[ $(command -v torify) ]]; then
 			PROXPOP_TORFETCH=1
 			shift
-		else
+		else 
 			pp_error "Torify is not installed!"
 		fi
 	;;
 	--proxy-fetch) PROXPOP_PROXYFETCH=1; shift; ;;
 	
 	# Other Options
-	-r, --resource)
+	-r|--resource)
 		shift
 		if [[ -f $1 ]]; then
 			RESOURCE_FILE=$1

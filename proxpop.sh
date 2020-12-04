@@ -22,7 +22,8 @@ usage: proxpop.sh [options]
 	
 	[Saftey Options]
 	-k, --keep     Keep old configuration file (Old file is copied to /usr/share/proxpop/proxychains.old)
-	--review   Review final configuration file before finalizing (-s/--silent does not apply to this option)
+	--restore      Restore the old configuration file (this does not run proxpop)
+	--review       Review final configuration file before finalizing (--silent does not apply to this option)
 	
 	[Fetch Options]
 	--tor-fetch    Try to fetch resources through TOR (must have TOR installed, may not work since many sites block TOR nodes)
@@ -49,6 +50,8 @@ Each resource should return a list of proxy IPs and PORT in the IP:PORT formate,
 '
 
 TEMPLATE_MODE="dynamic_chain"
+TEMPLATE_TORLINE="socks4 127.0.0.1 9050"
+
 declare -A PP_TOPTS # template options
 PP_TOPTS["quiet_mode"]="#" # this indicates that we will comment out this option
 PP_TOPTS["proxy_dns"]=""
@@ -94,7 +97,6 @@ pp_exit() {
 	exit $1
 }
 
-# Curl something and them append output to 
 pp_curl() {
 	local out=$1; shift;
 	
@@ -119,6 +121,9 @@ add_proxy() {
 fetch_proxies() {
 	pp_echo "Fetching proxies..."
 	echo "[ProxyList]" >> $TMP_CONF
+	
+	#[[ $PROXPOP_TORFIRST ]] && echo "$TEMPLATE_TORLINE" >> $TMP_CONF
+	
 	while IFS= read -r rec; do
 		if [[ "${rec:0:4}" == "http" ]] && [[ ! "$PROXPOP_HTTP" == "" ]]; then
 			pp_curl $TMP_HTTP "${rec:5}"
@@ -137,9 +142,7 @@ populate() {
 	pp_echo ""
 	pp_echo "Starting ProxPop..."
 	
-	if [[ $PROXPOP_KEEP ]]; then # keep old config 
-		cp -f $PC_CONF_PATH $OLD_CONFIG
-	fi
+	[[ $PROXPOP_KEEP ]] && cp -f $PC_CONF_PATH $OLD_CONFIG # keep old config 
 	
 	pp_echo "Writing configuration file..."
 	touch $TMP_CONF # create base config file
@@ -152,7 +155,7 @@ populate() {
 	
 	fetch_proxies
 	
-	chmod 644 $TMP_CONF
+	chmod --reference=$PC_CONF_PATH $TMP_CONF
 	
 	sleep 1
 	pp_echo "New configuration is ready!"
@@ -203,9 +206,10 @@ get_first_n() {
 	echo "$ret"
 }
 
-if [ "$EUID" -ne 0 ]
-	then echo "Error: This script must be run as root!"
-	exit
+if [ "$EUID" -ne 0 ]; then
+	pp_error "Error: This script must be run with elevated privileges!"
+elif [[ $(command -v proxychains) ]]; then
+	pp_error "Error: You must have proxychains installed!"
 fi
 
 while [[ "$#" -gt 0 ]]; do
@@ -258,6 +262,15 @@ while [[ "$#" -gt 0 ]]; do
 	
 	# Safety options
 	-k|--keep) PROXPOP_KEEP=1; shift; ;;
+	--restore)
+		if [[ -f $OLD_CONFIG ]]; then
+			cp -f $OLD_CONFIG $PC_CONF_PATH
+			echo "Old configuration file was restored!"
+			pp_exit 0
+		else
+			pp_error "No old configuration file was found!"
+		fi
+	;;
 	--review) PROXPOP_REVIEW=1; shift; ;;
 	
 	# Fetch options

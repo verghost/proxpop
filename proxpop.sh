@@ -187,7 +187,7 @@ populate() {
 }
 
 set_template_mode() {
-	if [[ TEMPLATE_MODE == "dynamic_chain" ]]; then # is this still the default?
+	if [[ "$TEMPLATE_MODE" == "dynamic_chain" ]]; then # is this still the default?
 		TEMPLATE_MODE="$1"
 	else
 		pp_error "You must only specify one mode!"

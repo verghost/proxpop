@@ -1,30 +1,36 @@
 #!/bin/bash
 # ProxPop v0: A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
 # Written by verghost (https://github.com/verghost)
-#
 
 usage=\
 'ProxPop: Proxychains config populator
 A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
 
-usage: proxpop.sh [options] [FILE]
+usage: proxpop.sh [options]
 	[Proxy Types]
 	--http         Populate HTTP proxies
 	--socks4       Populate SOCKS4 proxies
 	--scosk5       Populate SCOKS5 proxies
 	--all          Populate all types of proxies (HTTP, SOCKS4 & SOCKS5)
 	
+	[Template Options]
+	-t, --template Use custom template file (Default is proxychains.template)
+	-q, --quiet    Use proxychains quiet mode
+	--no-proxy-dns Do NOT proxy DNS requests (this is ON by default)
+	--use-strict   Use strict chain in template file (default is dynamic_chain)
+	--use-random   Use random chain. You can optionally provide chain length: proxpop.sh ... --use-random 3 (Default length is: 2)
+	
 	[Saftey Options]
 	-k, --keep     Keep old configuration file (Old file is copied to /usr/share/proxpop/proxychains.old)
-	-r, --review   Review final configuration file before finalizing (-q/--quiet does not apply to this option)
+	-r, --review   Review final configuration file before finalizing (-s/--silent does not apply to this option)
 	
 	[Fetch Options]
 	--tor-fetch    Try to fetch resources through TOR (must have TOR installed, may not work since many sites block TOR nodes)
 	--proxy-fetch  Try to fetch resources through proxy (may not work if proxychains is improperly configured)
 	
 	[Other Options]
-	-t, --template Custom template file (Default is proxychains.template)
-	-q, --quiet    Do not display output (does not apply to --review, torify or proxychains)
+	-r, --resource Specify a custom resource file (ex. proxpop.sh ... -r resource.txt)
+	-s, --silent   Do not display output (does not apply to --review, torify or proxychains)
 	-h, --help     Show this message
 
 NOTES:
@@ -42,6 +48,14 @@ Each resource should return a list of proxy IPs and PORT in the IP:PORT formate,
 106.14.237.164:8080
 '
 
+TEMPLATE_MODE="dynamic_chain"
+declare -A PP_TOPTS # template options
+PP_TOPTS["quiet_mode"]="#" # this indicates that we will comment out this option
+PP_TOPTS["proxy_dns"]=""
+PP_TOPTS["chain_len"]="#"
+PP_TOPTS["tcp_read_time_out"]=15000
+PP_TOPTS["tcp_connect_time_out"]=8000
+
 TMP_HTTP="/tmp/http_prox_${RANDOM}"
 TMP_SOCKS4="/tmp/socks5_prox_${RANDOM}"
 TMP_SOCKS5="/tmp/socks4_prox_${RANDOM}"
@@ -55,8 +69,17 @@ PP_CURL="curl" # curl function
 RESOURCE_FILE="/usr/share/proxpop/resources.default" # Defaults
 TEMPLATE_FILE="/usr/share/proxpop/proxychain.template"
 
+
+# Util functions
+
 pp_echo() {
-	if [[ ! $PROXPOP_QUIET ]]; then echo "$*"; fi
+	if [[ ! $PROXPOP_SILENT ]]; then echo "$*"; fi
+}
+
+pp_error() {
+	local code=$2; [[ "$code" == "" ]] && code=1;
+	echo "$1" >&2
+	exit $code
 }
 
 pp_exit() {
@@ -71,17 +94,10 @@ pp_exit() {
 	exit $1
 }
 
-add_proxy() {
-	local type=$1
-	local file=$2
-	while IFS=, read -r ipp; do
-		echo "$type $ipp" | awk -F':' '{print $1,$2}' >> $TMP_CONF
-	done < $file
-}
-
+# Curl something and them append output to 
 pp_curl() {
 	local out=$1; shift;
-	local tmp="./output_${RANDOM}.tmp"
+	local tmp="/tmp/ppcurl_output_${RANDOM}.tmp"
 	
 	if [[ $PROXPOP_TORFETCH ]]; then 
 		torify curl -s -o "$tmp" $*
@@ -95,16 +111,28 @@ pp_curl() {
 	rm -f $out
 }
 
+add_proxy() {
+	local type=$1
+	local file=$2
+	while IFS=, read -r ipp; do
+		echo "$type $ipp" | awk -F':' '{print $1,$2}' >> $TMP_CONF
+	done < $file
+	echo "" > $file # clear temp file
+}
+
 fetch_proxies() {
 	pp_echo "Fetching proxies..."
-	
+	echo "[ProxyList]" >> $TMP_CONF
 	while IFS=, read -r rec; do
 		if [[ "${rec:0:4}" == "http" ]] && [[ $PROXPOP_HTTP ]]; then
 			pp_curl "$TMP_HTTP" "${rec:5}"
+			add_proxy "http" $TMP_HTTP
 		elif [[ "${rec:0:5}" == "socks4" ]] && [[ $PROXPOP_SOCKS4 ]]; then
 			pp_curl "$TMP_SOCKS4" "${rec:6}"
+			add_proxy "socks4" $TMP_SOCKS4
 		elif [[ "${rec:0:5}" == "socks5" ]] && [[ $PROXPOP_SOCKS5 ]]; then
 			pp_curl "$TMP_SOCKS5" "${rec:6}"
+			add_proxy "socks5" $TMP_SOCKS5
 		fi
 	done < $RESOURCE_FILE
 }
@@ -113,7 +141,14 @@ populate() {
 	pp_echo ""
 	pp_echo "Starting ProxPop..."
 	
-	cp $TEMPLATE_FILE $TMP_CONF # create base config file
+	pp_echo "Writing configuration file..."
+	echo "" > $TMP_CONF # create base config file
+	for k in "${!PP_TOPTS[@]}"
+	do
+		if [[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]]; then
+			echo "$k ${PP_TOPTS[$k]}" >> $TMP_CONF
+		fi
+	done
 	
 	fetch_proxies
 	
@@ -147,6 +182,14 @@ populate() {
 	pp_exit 0
 }
 
+set_template_mode() {
+	if [[ TEMPLATE_MODE == "dynamic_chain" ]]; then # is this still the default?
+		TEMPLATE_MODE="$1"
+	else
+		pp_error "You must only specify one mode!"
+	fi
+}
+
 while [[ "$#" -gt 0 ]]; do
 	case "$1" in
 	# Proxy types
@@ -160,6 +203,28 @@ while [[ "$#" -gt 0 ]]; do
 		shift
 	;;
 	
+	# Template options
+	-t|--template)
+		shift
+		if [[ -f $1 ]]; then
+			TEMPLATE_FILE=$1
+			shift
+		else
+			pp_error "$1 is not a file!"
+		fi
+	;;
+	-q|--quiet) PP_TOPTS["quiet_mode"]=""; shift; ;;
+	--no-proxy-dns) PP_TOPTS["proxy_dns"]="#"; shift; ;;
+	--use-strict) set_template_mode "strict_chain"; shift; ;;
+	--use-random) 
+		set_template_mode "random_chain"
+		shift
+		case "$1" in # https://stackoverflow.com/a/3951175
+			''|*[!0-9]*) ;; # negates strings, floating point and negative numbers
+			*) PP_TOPTS["chain_len"]="= $1" ;;
+		esac
+	;;
+	
 	# Safety options
 	-k|--keep) PROXPOP_KEEP=1; shift; ;;
 	--review) PROXPOP_REVIEW=1; shift; ;;
@@ -170,30 +235,30 @@ while [[ "$#" -gt 0 ]]; do
 			PROXPOP_TORFETCH=1
 			shift
 		else
-			echo "Torify is not installed!" >&2
-			exit 1
+			pp_error "Torify is not installed!"
 		fi
 	;;
 	--proxy-fetch) PROXPOP_PROXYFETCH=1; shift; ;;
 	
 	# Other Options
-	-t|--template)	shift; TEMPLATE_FILE=$1; shift; ;;
-	-q|--quiet) PROXPOP_QUIET=1; shift; ;;
+	-r, --resource)
+		shift
+		if [[ -f $1 ]]; then
+			RESOURCE_FILE=$1
+			shift
+		else
+			pp_error "$1 is not a file!"
+		fi
+	;;
+	-s|--silent) PROXPOP_SILENT=1; shift; ;;
 	-h|--help) echo "$usage"; exit; ;;
 	
 	-*) # handle unknown
-		echo "Unknown option: $1" >&2
-		exit 1
+		pp_error "Unknown option: $1"
 	;;
 	
-	*) # handle file
-		if [[ -f $1 ]]; then
-			PROXPOP_CUSTOM=$1
-			shift
-		else
-			echo "$1 is not a file!" >&2
-			exit 1
-		fi
+	*) # other stuff
+		pp_error "I have no idea why you passed $1!"
 	;;
 	esac
 done

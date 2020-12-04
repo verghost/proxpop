@@ -29,7 +29,7 @@
 # this option is good to test your IDS :)
 
 # Make sense only if random_chain
-chain_len = 3
+#chain_len = 3
 
 # Quiet mode (no output from library)
 quiet_mode
@@ -61,4 +61,4 @@ tcp_connect_time_out 8000
 # add proxy here ...
 # meanwile
 # defaults set to "tor"
-socks4  127.0.0.1 9050
+#socks4  127.0.0.1 9050

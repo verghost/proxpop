@@ -247,10 +247,12 @@ while [[ "$#" -gt 0 ]]; do
 	-q|--quiet) PP_TOPTS["quiet_mode"]=""; shift; ;;
 	--no-proxy-dns) PP_TOPTS["proxy_dns"]="#"; shift; ;;
 	--use-strict) set_template_mode "strict_chain"; shift; ;;
-	--use-random) 
+	--use-random)
 		set_template_mode "random_chain"
 		shift
-		PP_TOPTS["chain_len"]="= $(get_first_n $1 2)"
+		local chain_len="$(get_first_n $1 t)"
+		if [[ "$chain_len" == "t" ]]; then PP_TOPTS["chain_len"]="= 2"; 
+		else shift; PP_TOPTS["chain_len"]="= ${chain_len}"; fi
 	;;
 	
 	# Safety options

@@ -1,0 +1,35 @@
+File formats for proxpop.sh
+
+Template file:
+	-> Valid proxychains configuration file.
+	-> Must not contain a proxy list, meaning no line can contain:
+		-> The "[ProxyList]" identifier
+		-> Proxy entries (ex. 123.456.789.098 8080)
+Example: see proxychains.template
+
+Resource file:
+	-> Specifies resources to grab proxies from
+	-> Any text content will be considered a comment unless it follows the format "type URL"
+	-> type is one of "http", "socks4", "socks5" (case sensitive)
+	-> URL is a valid link pointing to a list of proxy IPs, ports and credentials
+		-> Fields must be separated exclusively by a colon or by spaces (i.e. already valid proxychains entries)
+			-> Separators can not be mixed (i.e. IP:PORT USER PASS)
+		-> Example with colons: 192.157.34.2:8080:jerry:password
+Example:
+see resource.default
+
+Chain file (only makes sense using dynamic or static chain)
+	-> Tells the script how the final proxychain should be laid out
+	-> Each line should start with one of "http", "socks4", "socks5" (case sensitive)
+		-> lines of this form will be replaces with proxies of the specified type
+			-> Optionally, you can provide a number of proxies by appending ":n" to the type, where n=number of proxies to add.
+Example: 
+# This chain file will tell the script to make a proxy list that will add:
+# 4 http proxies, 3 socks5 proxies, then all socks4 proxies, 2 more http proxies then all remaining socks5 proxies
+# This will discard all but the first 6 http proxies
+# If not enough proxies are available to fill the number specified, then as many proxies will be added as are available
+http:4
+socks5:3
+socks4
+http:2
+socks5

@@ -179,7 +179,7 @@ populate() {
 		cp -f $TEMPLATE_FILE $TMP_CONF
 	else
 		echo "" > $TMP_CONF # create empty config file
-		echo $TEMPLATE_MODE > $TMP_CONF
+		echo "$TEMPLATE_MODE" > $TMP_CONF
 		for k in "${!PP_TOPTS[@]}"; do
 			if [[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]]; then
 				echo "$k ${PP_TOPTS[$k]}" >> $TMP_CONF
@@ -226,15 +226,15 @@ while [[ "$#" -gt 0 ]]; do
 	# Proxy types
 	--only-http) 
 		shift
-		PROXPOP_SOCKS4=; PROXPOP_SOCKS5=
+		PROXPOP_HTTP=1; PROXPOP_SOCKS4=; PROXPOP_SOCKS5=
 	;;
 	--only-socks4) 
 		shift
-		PROXPOP_HTTP=; PROXPOP_SOCKS5=
+		PROXPOP_HTTP=; PROXPOP_SOCKS4=1; PROXPOP_SOCKS5=
 	;;
 	--only-socks5) 
 		shift
-		PROXPOP_HTTP=; PROXPOP_SOCKS4=
+		PROXPOP_HTTP=; PROXPOP_SOCKS4=; PROXPOP_SOCKS5=1
 	;;
 	
 	# Template options
@@ -311,12 +311,6 @@ elif [[ ! $(command -v curl) ]]; then
 	pp_error "Error: You must have curl installed!"
 elif [[ ! $(command -v proxychains) ]]; then
 	pp_error "Error: You must have proxychains installed!"
-fi
-
-# Run if a proxy type has been specified
-if [[ ! "$PROXPOP_HTTP" == "" ]] || [[ ! "$PROXPOP_SOCKS4" == "" ]] || [[ ! "$PROXPOP_SOCKS5" == "" ]]; then
-	populate
 else
-	echo "You must supply at least one type of proxy to populate (--http, --socks4, --socks5, --all)"
-	echo "For usage, type: proxpop.sh --help"
+	populate
 fi

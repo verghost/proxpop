@@ -47,6 +47,7 @@ PP_TOPTS["tcp_read_time_out"]=15000
 PP_TOPTS["tcp_connect_time_out"]=8000
 
 PROXPOP_HTTP=1; PROXPOP_SOCKS4=1; PROXPOP_SOCKS5=1;
+PROXPOP_STARTED=
 
 TMP_HTTP="/tmp/http_prox"
 TMP_SOCKS4="/tmp/socks5_prox"
@@ -59,7 +60,6 @@ OLD_CONFIG="/usr/share/proxpop/proxychains.old"
 CHAIN_FILE=""
 RESOURCE_FILE="/usr/share/proxpop/resources.default" # Defaults
 TEMPLATE_FILE="/usr/share/proxpop/proxychain.template"
-
 
 # Util functions
 pp_yorn() {
@@ -84,22 +84,21 @@ pp_echo() {
 	if [[ ! $PROXPOP_SILENT ]]; then echo "$*"; fi
 }
 
+pp_exit() {
+	pp_echo "Cleaning up..."
+	rm -f $TMP_CONF $TMP_HTTP $TMP_SOCKS4 $TMP_SOCKS5
+	
+	pp_echo "| -------- |"
+	pp_echo "| ALL DONE |"
+	pp_echo "| -------- |"
+	
+	exit "$1"
+}
+
 pp_error() {
 	local code=$2; [[ "$code" == "" ]] && code=1;
 	echo "$1" >&2
-	exit "$code"
-}
-
-pp_exit() {
-	echo "Cleaning up..."
-	rm -f $TMP_CONF
-	rm -f $TMP_HTTP $TMP_SOCKS4 $TMP_SOCKS5
-	
-	echo "| -------- |"
-	echo "| ALL DONE |"
-	echo "| -------- |"
-	
-	exit "$1"
+	if [ $PROXPOP_STARTED ]; then exit "$code"; else pp_exit "$code"; fi
 }
 
 pp_curl() {
@@ -171,6 +170,10 @@ add_proxies() {
 populate() {
 	pp_echo ""
 	pp_echo "Starting ProxPop..."
+	
+	# Touch files
+	touch $TMP_CONF $TMP_HTTP $TMP_SOCKS4 $TMP_SOCKS5
+	PROXPOP_STARTED=1
 	
 	[[ $PROXPOP_KEEP ]] && cp -f $PROXPOP_OUTPUT $OLD_CONFIG # keep old config 
 	
@@ -316,7 +319,7 @@ elif [[ ! $(command -v curl) ]]; then
 	pp_error "Error: You must have curl installed!"
 elif [[ ! $(command -v proxychains) ]]; then
 	pp_error "Error: You must have proxychains installed!"
-elif [[ -f $RESOURCE_FILE ]]; then
+elif [[ ! -f $RESOURCE_FILE ]]; then
 	pp_error "Error: Resource file does not exist!"
 else
 	populate

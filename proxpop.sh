@@ -103,16 +103,13 @@ pp_error() {
 
 pp_curl() {
 	local out=$1; shift
-	local tmpf="./.tmpfile_${RANDOM}"
+	local tmpf="./.tmpfile_${RANDOM}"; echo "" > $tmpf
 	if [[ $PROXPOP_TORFETCH ]]; then 
 		torify curl -s -o $tmpf "$@"
 	elif [[ $PROXPOP_PROXYFETCH ]]; then
 		proxychains curl -s -o $tmpf "$@"
-	else
-		curl -s -o $tmpf "$@"
-	fi
-	cat $tmpf >> "$out"
-	rm -f $tmpf
+	else curl -s -o $tmpf "$@"; fi
+	cat $tmpf >> "$out"; rm -f $tmpf
 }
 
 set_template_mode() {

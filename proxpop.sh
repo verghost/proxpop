@@ -123,7 +123,7 @@ set_template_mode() {
 }
 
 get_file() {
-	if [[ -f $1 ]]; then echo "$1"; shift
+	if [[ -f $1 ]]; then echo "$1"
 	else pp_error "$1 is not a file!"; fi
 }
 
@@ -246,12 +246,9 @@ while [[ "$#" -gt 0 ]]; do
 	;;
 	
 	# Template options
-	-t|--template) shift; TEMPLATE_FILE=$(get_file "$1") ;;
-	-r|--resource) shift; RESOURCE_FILE=$(get_file "$1") ;;
-	-c|--chain) 
-		shift
-		CHAIN_FILE=$(get_file "$1")
-	;;
+	-t|--template) shift; TEMPLATE_FILE=$(get_file "$1"); shift ;;
+	-r|--resource) shift; RESOURCE_FILE=$(get_file "$1"); shift ;;
+	-c|--chain) shift; CHAIN_FILE=$(get_file "$1");	shift ;;
 	-q|--quiet) PP_TOPTS["quiet_mode"]=""; shift; ;;
 	--no-proxy-dns) PP_TOPTS["proxy_dns"]="#"; shift; ;;
 	--use-strict) set_template_mode "strict_chain"; shift; ;;

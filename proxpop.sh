@@ -18,8 +18,8 @@ usage: proxpop.sh [options]
 	-r, --resource Specify a custom resource file (ex. proxpop.sh ... -r resource.txt)
 	-q, --quiet    Use proxychains quiet mode
 	--no-proxy-dns Do NOT proxy DNS requests (this is ON by default)
-	--use-strict   Use strict chain in template file (default is dynamic_chain)
-	--use-random   Use random chain. You can optionally provide chain length: proxpop.sh ... --use-random 3 (Default length is: 2)
+	--strict       Use strict chain in template file (default is dynamic_chain)
+	--random       Use random chain. You can optionally provide chain length: proxpop.sh ... --use-random 3 (Default length is: 2)
 	
 	[Saftey Options]
 	-o, --output   Choose an output location for the new config file (Default is /etc/proxychains.conf)
@@ -64,8 +64,7 @@ TEMPLATE_FILE="/usr/share/proxpop/proxychain.template"
 # Util functions
 pp_yorn() {
 	while true; do
-		echo -n "$1 (y/N): "
-		read -r yorn
+		echo -n "$1 (y/N): "; read -r yorn
 		if [[ "$yorn" == "y" ]] || [[ "$yorn" == "Y" ]]; then PP_YORN_RET="y"; break
 		elif [[ "$yorn" == "n" ]] || [[ "$yorn" == "N" ]]; then PP_YORN_RET="n"; break
 		else echo "Not a valid response!"; fi
@@ -134,10 +133,11 @@ add_proxy() {
 	local type=$1 file=$2 n=$3 i=0
 	while IFS= read -r ipp; do
 		if [[ ! "$n" == "" ]] && [[ $i -ge $n ]]; then break; fi
+		if [[ "$ipp" == "" ]]; then continue; fi
 		echo "$type $ipp" | awk -F':' '{print $1,$2}' >> $TMP_CONF
 		((i++))
 	done < "$file"
-	pp_echo "Added $i '${type}' proxies!"
+	pp_echo "Added $i '${type}' proxie(s)!"
 }
 
 add_proxies() {
@@ -181,9 +181,7 @@ populate() {
 		echo "" > $TMP_CONF # create empty config file
 		echo "$TEMPLATE_MODE" > $TMP_CONF
 		for k in "${!PP_TOPTS[@]}"; do
-			if [[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]]; then
-				echo "$k ${PP_TOPTS[$k]}" >> $TMP_CONF
-			fi
+			[[ ! "${PP_TOPTS[$k]:0:1}" == "#" ]] && echo "$k ${PP_TOPTS[$k]}" >> $TMP_CONF
 		done
 	fi
 	
@@ -228,7 +226,6 @@ populate() {
 }
 
 # Parse params
-#declare -A PARAM_HISTORY
 while [[ "$#" -gt 0 ]]; do
 	case "$1" in
 	# Proxy types
@@ -251,8 +248,8 @@ while [[ "$#" -gt 0 ]]; do
 	-c|--chain) shift; CHAIN_FILE=$(get_file "$1");	shift ;;
 	-q|--quiet) PP_TOPTS["quiet_mode"]=""; shift; ;;
 	--no-proxy-dns) PP_TOPTS["proxy_dns"]="#"; shift; ;;
-	--use-strict) set_template_mode "strict_chain"; shift; ;;
-	--use-random)
+	--strict) set_template_mode "strict_chain"; shift; ;;
+	--random)
 		set_template_mode "random_chain"
 		shift
 		PP_TOPTS["chain_len"]="= $(get_first_n "$1" d)"
@@ -318,6 +315,4 @@ elif [[ ! $(command -v proxychains) ]]; then
 	pp_error "Error: You must have proxychains installed!"
 elif [[ ! -f $RESOURCE_FILE ]]; then
 	pp_error "Error: Resource file does not exist!"
-else
-	populate
-fi
+else populate; fi

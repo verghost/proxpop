@@ -190,15 +190,23 @@ populate() {
 	echo "[ProxyList]" >> $TMP_CONF # start proxy list in config
 	
 	pp_echo "Fetching proxies..."
+	local prox_read=
 	while IFS= read -r rec; do
 		if [[ "${rec:0:4}" == "http" ]] && [[ $PROXPOP_HTTP ]]; then
 			pp_curl $TMP_HTTP "${rec:5}"
+			prox_read=1
 		elif [[ "${rec:0:6}" == "socks4" ]] && [[ $PROXPOP_SOCKS4 ]]; then
 			pp_curl $TMP_SOCKS4 "${rec:6}"
+			prox_read=1
 		elif [[ "${rec:0:6}" == "socks5" ]] && [[ $PROXPOP_SOCKS5 ]]; then
 			pp_curl $TMP_SOCKS5 "${rec:6}"
+			prox_read=1
 		fi
 	done < "$RESOURCE_FILE"
+	
+	if [[ ! $prox_read ]]; then
+		pp_error "Error: No proxies to populate!"
+	fi
 	
 	add_proxies
 	
@@ -311,6 +319,8 @@ elif [[ ! $(command -v curl) ]]; then
 	pp_error "Error: You must have curl installed!"
 elif [[ ! $(command -v proxychains) ]]; then
 	pp_error "Error: You must have proxychains installed!"
+elif [[ -f $RESOURCE_FILE ]]; then
+	pp_error "Error: Resource file does not exist!"
 else
 	populate
 fi

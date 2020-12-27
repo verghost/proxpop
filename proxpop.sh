@@ -1,5 +1,5 @@
 #!/bin/bash
-# ProxPop v0: A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
+# ProxPop v0.1: A simple bash script that populates the proxychains config (/etc/proxychains.conf) with proxies from custom resources.
 # Written by verghost (https://github.com/verghost)
 
 usage=\
@@ -13,13 +13,13 @@ usage: proxpop.sh [options]
 	--only-socks5  Populate only SCOKS5 proxies
 	
 	[Template Options]
+	--strict       Use strict chain in template file (default is dynamic_chain)
+	--random       Use random chain. You can optionally provide chain length: proxpop.sh ... --use-random 3 (Default length is: 2)
+	--no-proxy-dns Do NOT proxy DNS requests (this is ON by default)
 	-t, --template Use custom template file (Default is proxychains.template)
 	-c, --chain    Specify a custom chain file (ex. proxpop.sh ... -c chain.txt)
 	-r, --resource Specify a custom resource file (ex. proxpop.sh ... -r resource.txt)
-	-q, --quiet    Use proxychains quiet mode
-	--no-proxy-dns Do NOT proxy DNS requests (this is ON by default)
-	--strict       Use strict chain in template file (default is dynamic_chain)
-	--random       Use random chain. You can optionally provide chain length: proxpop.sh ... --use-random 3 (Default length is: 2)
+	-q, --quiet    Use proxychains quiet mode in template file
 	
 	[Saftey Options]
 	-o, --output   Choose an output location for the new config file (Default is /etc/proxychains.conf)

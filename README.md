@@ -38,7 +38,7 @@ The custom resource FILE must specify resources one at a time, each on their own
 Each resource lines should have the following format TYPE:URL where TYPE is one of HTTP, SOCKS4, SOCKS5 (This is CASE SENSITIVE)  
 As an example, see the defaults resource file:  
 
-Each resource should return a list of proxy IPs and PORT in the IP:PORT formate, for example:  
+Each resource should return a list of proxies in the IP:PORT format, for example:  
 103.31.251.17:8080  
 37.255.248.77:8080  
 221.182.31.54:8080  
